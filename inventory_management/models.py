@@ -18,6 +18,11 @@ class SandwichIngredient(models.Model):
     reg_dtime = models.DateTimeField(default=timezone.now) # 재고 등록일시
     modify_dtime = models.DateTimeField(default=timezone.now) # 재고 수정일시
 
+    class Meta:
+        ordering = ["stock_no"]
+    
+    def __str__(self):
+        return self.name
 
  # 샌드위치
 class SandwichOrder(models.Model):
@@ -25,4 +30,7 @@ class SandwichOrder(models.Model):
     sandwich_no = models.PositiveIntegerField(unique=True) # 샌드위치 번호
     ingredient_name = models.CharField(max_length=50, null=False) # 재료명
     ingredient_cnt = models.PositiveIntegerField(default=1) # 선택한 재료 개수
+
+    class Meta:
+        ordering = ["log_no", "sandwich_no"]
     
