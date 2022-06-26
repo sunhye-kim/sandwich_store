@@ -1,5 +1,5 @@
 from django.contrib import admin
-from inventory_management.models import SandwichIngredient
+from .models import SandwichIngredient
 
 # Register your models here.
 @admin.register(SandwichIngredient)

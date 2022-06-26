@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'inventory_management.apps.InventoryManagementConfig',
-    'rest_framework'
+    'drf_yasg',        # 추가
+    'rest_framework',  # 추가
 ]
 
 MIDDLEWARE = [
