@@ -235,6 +235,7 @@ class SetSandwichOrder(APIView):
     source = openapi.Parameter('source', openapi.IN_QUERY, description='샌드위치 재료 타입(소스) - 허니머스타드, 불닭소스, 스위트어니언. 케찹, 올리브오일 등, 최대 2개', required=True, type=openapi.TYPE_STRING)
 
     @swagger_auto_schema(tags=['샌드위치 주문 데이터 저장하기'], manual_parameters=[bread,toping,cheeze,source], responses={200: "Success"})
+    @transaction.atomic()
     def post(self,request):
         r_bread = request.GET.get('bread')
         r_toping = request.GET.get('toping')
@@ -270,26 +271,31 @@ class SetSandwichOrder(APIView):
             sandwich_no = sandwich_no_data.values()[0]['id'] + 1
         else:
             sandwich_no = 0
+        
+        # 인서트할 데이터 중에 재료가 없는거, 0개인게 없는지 확인
+        for type_key, value in sandwich_dict.items():
+            for _ingredient in value:
+                _ingredient_data = SandwichIngredient.objects.filter(Q(type=type_key) & Q(name=_ingredient))
 
+                if not _ingredient_data.exists():
+                    return Response(
+                        {'error' : {
+                        'code' : 404,
+                        'message' : "SandwichIngredient not found!"}})
+
+                if _ingredient_data.values()[0]['remain_cnt'] == 0:
+                    return Response(
+                        {'error' : {
+                        'code' : 404,
+                        'message' : "SandwichIngredient not remained"}})
+
+        redirect_url = '/inventory/get_sandwich_price/?' # 총합 계산을 위한 url 호출
+
+        #데이터 인서트
         with transaction.atomic():
-            
-            redirect_url = '/inventory/get_sandwich_price/?' # 총합 계산을 위한 url 호출
-
             for type_key, value in sandwich_dict.items():
                 for _ingredient in value:
                     _ingredient_data = SandwichIngredient.objects.filter(Q(type=type_key) & Q(name=_ingredient))
-
-                    if not _ingredient_data.exists():
-                        return Response(
-                            {'error' : {
-                            'code' : 404,
-                            'message' : "SandwichIngredient not found!"}})
-
-                    if _ingredient_data.values()[0]['remain_cnt'] == 0:
-                        return Response(
-                            {'error' : {
-                            'code' : 404,
-                            'message' : "SandwichIngredient not remained"}})
 
                     _ingredient_no = _ingredient_data.values('id')[0]['id']
                     ingredient_no_management(_ingredient_no, minus=True)
