@@ -47,10 +47,11 @@ class GetSandwichIngredientInventory(APIView):
         r_type = request.GET.get('type') # 빵,토핑,치즈,소스 만 가능
         r_name = request.GET.get('name')
 
-        try:
-            r_type = sandwich_type[r_type] # 재고 데이터 대치 (빵 -> BREAD, 토핑 -> TOPING)
-        except:
-            return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
+        if r_type:
+            try:
+                r_type = sandwich_type[r_type] # 재고 데이터 대치 (빵 -> BREAD, 토핑 -> TOPING)
+            except:
+                return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             # 파라미터별 검색 로직 
@@ -173,8 +174,8 @@ class DelSandwichIngredientInventory(APIView):
 # 샌드위치 주문 데이터 가져오기
 # type, name 별로 검색 가능
 class GetSandwichOrder(APIView):
-    search_type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스) - 필터링 시에만 사용', required=False, type=openapi.TYPE_STRING)
-    search_name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등) - 필터링 시에만 사용', required=False, type=openapi.TYPE_STRING)
+    search_type = openapi.Parameter('search_type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스) - 필터링 시에만 사용', required=False, type=openapi.TYPE_STRING)
+    search_name = openapi.Parameter('search_name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등) - 필터링 시에만 사용', required=False, type=openapi.TYPE_STRING)
 
     @swagger_auto_schema(tags=['샌드위치 주문 데이터 가져오기'], manual_parameters=[search_type,search_name], responses={200: "Success"})
     def get(self, request, page_num):
@@ -185,11 +186,12 @@ class GetSandwichOrder(APIView):
         r_search_type = request.GET.get('search_type')
         r_search_name = request.GET.get('search_name')
 
-        try:
-            r_search_type = sandwich_type[r_search_type]# 재고 데이터 대치 (빵 -> BREAD, 토핑 -> TOPING)
+        if r_search_type:
+            try:
+                r_search_type = sandwich_type[r_search_type]# 재고 데이터 대치 (빵 -> BREAD, 토핑 -> TOPING)
 
-        except:
-            return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
+            except:
+                return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             # 삭제된 데이터는 조회 안됨 (is_delete = 0)
@@ -363,6 +365,12 @@ class GetSandwichPrice(APIView):
         for type_key, value in sandwich_dict.items():
             for _ingredient in value:
                 _ingredient_data = SandwichIngredient.objects.filter(Q(type=type_key) & Q(name=_ingredient))
+                
+                if not _ingredient_data:
+                    return Response(
+                        {'error' : {
+                        'code' : 404,
+                        'message' : "SandwichIngredient not found!"}})
                 _ingredient_price = _ingredient_data.values('price')[0]['price']
                 total_price += int(_ingredient_price)
 
