@@ -16,8 +16,10 @@ from rest_framework.response import Response # TemplateResponse 형식 객체
 from drf_yasg.utils import swagger_auto_schema
 
 import traceback
+import json
 
 from .models import SandwichIngredient, SandwichOrder # model
+from .serializers import SandwichIngredientSerializer, SandwichSerializer, IngredientSerializer, SandwichNoSerializer
 
 from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
@@ -83,22 +85,16 @@ class GetSandwichIngredientInventory(APIView):
 # 샌드위치 재료 데이터 추가
 # 최초 인서트되는 데이터는 추가, 이미 존재하는 데이터는 업데이트
 class SetSandwichIngredientInventory(APIView):
-    type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=False, type=openapi.TYPE_STRING)
-    name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등)', required=False, type=openapi.TYPE_STRING)
-    plus_cnt = openapi.Parameter('plus_cnt', openapi.IN_QUERY, 
-                                description='추가할 데이터 개수 (최초 인서트 시 개수만큼 추가, 존재하는 데이터 인서트 시 파라미터 개수만큼 더하기', 
-                                required=False, type=openapi.TYPE_STRING)
-    price = openapi.Parameter('price', openapi.IN_QUERY, description='샌드위치 재료 가격 (insert, update)', required=False, type=openapi.TYPE_STRING)
-
-    @swagger_auto_schema(tags=['샌드위치 재고 데이터 추가 및 업데이트'], manual_parameters=[type,name,plus_cnt,price], responses={200: "Success"})
+    @swagger_auto_schema(tags=['샌드위치 재고 데이터 추가 및 업데이트'], request_body=SandwichIngredientSerializer)
+    @transaction.atomic
     def post(self, request):
-        r_type = request.POST.get('type')
-        r_name = request.POST.get('name')
-        r_plus_cnt = request.POST.get('remain_cnt')
-        r_price = request.POST.get('price')
-
         try:
-            r_type = sandwich_type[r_type] # 재고 데이터 대치 (빵 -> BREAD, 토핑 -> TOPING)
+            r_data = json.loads(request.body)
+            r_type = r_data['type']
+            r_name = r_data['name']
+            r_plus_cnt = r_data['remain_cnt']
+            r_price = r_data['price']
+            r_type = sandwich_type[r_type]
         except:
             return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -137,14 +133,13 @@ class SetSandwichIngredientInventory(APIView):
 # 샌드위치 재고 데이터 삭제
 # type, name 별 삭제
 class DelSandwichIngredientInventory(APIView):
-    type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=True, type=openapi.TYPE_STRING)
-    name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등)', required=True, type=openapi.TYPE_STRING)
-
-    @swagger_auto_schema(tags=['샌드위치 재고 데이터 삭제'], manual_parameters=[type,name], responses={200: "Success"})
+    @swagger_auto_schema(tags=['샌드위치 재고 데이터 삭제'], request_body=IngredientSerializer)
+    @transaction.atomic
     def post(self, request):
         try:
-            r_type = request.POST['type']
-            r_name = request.POST['name']
+            r_data = json.loads(request.body)
+            r_type = r_data['type']
+            r_name = r_data['name']
             r_type = sandwich_type[r_type]
         except:
             return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
@@ -242,24 +237,19 @@ class GetSandwichOrder(APIView):
 
 # 샌드위치 주문 데이터 저장
 class SetSandwichOrder(APIView):
-    bread = openapi.Parameter('bread', openapi.IN_QUERY, description='샌드위치 재료 타입(빵) - 식빵, 호밀빵, 치아바타 등, 최대 1개', required=True, type=openapi.TYPE_STRING)
-    toping = openapi.Parameter('toping', openapi.IN_QUERY, description='샌드위치 재료 타입(토핑) - 햄, 베이컨, 치킨, 양상추, 토마토 등, 최대 2개', required=True, type=openapi.TYPE_STRING)
-    cheeze = openapi.Parameter('cheeze', openapi.IN_QUERY, description='샌드위치 재료 타입(치즈) - 모짜렐라치즈, 슈레드치즈, 체다치즈 등, 최대 1개', required=True, type=openapi.TYPE_STRING)
-    source = openapi.Parameter('source', openapi.IN_QUERY, description='샌드위치 재료 타입(소스) - 허니머스타드, 불닭소스, 스위트어니언. 케찹, 올리브오일 등, 최대 2개', required=True, type=openapi.TYPE_STRING)
+    @swagger_auto_schema(tags=['샌드위치 주문 데이터 저장'], request_body=SandwichSerializer)
+    @transaction.atomic
+    def post(self, request):
+        try:
+            r_data = json.loads(request.body)
+            r_bread = r_data['bread']
+            r_toping = r_data['toping']
+            r_cheeze = r_data['cheeze']
+            r_source = r_data['source']
+            
+        except:
+            return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @swagger_auto_schema(tags=['샌드위치 주문 데이터 저장하기'], manual_parameters=[bread,toping,cheeze,source], responses={200: "Success"})
-    @transaction.atomic()
-    def post(self,request):
-        r_bread = request.GET.get('bread')
-        r_toping = request.GET.get('toping')
-        r_cheeze = request.GET.get('cheeze')
-        r_source = request.GET.get('source')
-
-        if not r_bread or not r_toping or not r_cheeze or not r_source: # 데이터 없으면 데러
-            return Response(
-                {'error' : {
-                'code' : 405,
-                'message' : "All ingredient was not selected"}})
 
         # 샌드위치 데이터 str -> list, ex) '토마토,햄' -> ['토마토','햄']
         bread = str(r_bread).replace(' ','').split(',')
@@ -388,15 +378,15 @@ class GetSandwichPrice(APIView):
 
 # 샌드위치 주문 데이터 삭제
 class DelSandwichOrder(APIView):
-    sandwich_no = openapi.Parameter('sandwich_no', openapi.IN_QUERY, description='샌드위치 번호', required=True, type=openapi.TYPE_NUMBER)
-
-    @swagger_auto_schema(tags=['샌드위치 주문 데이터 삭제하기'], manual_parameters=[sandwich_no], responses={200: "Success"})
-    def post(request):
+    @swagger_auto_schema(tags=['샌드위치 주문 데이터 삭제하기'], request_body=SandwichNoSerializer)
+    @transaction.atomic
+    def post(self, request):
         try:
-            sandwich_no = request.POST['sandwich_no']
+            r_data = json.loads(request.body)
+            sandwich_no = r_data['sandwich_no']
         except:
             return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             # pk(인스턴스의 id)값을 받아 어떤 인스턴스인지 특정
             # url slug로 pk값을 받도록 urls.py에서 설정해준다.
