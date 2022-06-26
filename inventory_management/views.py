@@ -386,6 +386,7 @@ class GetSandwichPrice(APIView):
         return JsonResponse(return_data, safe=False)
 
 
+# 샌드위치 주문 데이터 삭제
 class DelSandwichOrder(APIView):
     sandwich_no = openapi.Parameter('sandwich_no', openapi.IN_QUERY, description='샌드위치 번호', required=True, type=openapi.TYPE_NUMBER)
 
@@ -449,4 +450,3 @@ def ingredient_no_management(_ingredient_no, minus=True):
         bread_inventory_data = SandwichIngredient.objects.get(pk=_ingredient_no)
         bread_inventory_data.remain_cnt = int(bread_inventory_data.remain_cnt) + 1
         bread_inventory_data.save()
-        
