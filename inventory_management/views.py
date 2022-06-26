@@ -23,13 +23,19 @@ from rest_framework.views import APIView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
+sandwich_type = {
+    "빵" : "BREAD",
+    "토핑" : "TOPING",
+    "소스" : "SOURCE",
+    "치즈" : "CHEEZE"
+}
 
 # class InventoryManagement
 class GetSandwichIngredientInventory(APIView):
-    type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=False, type=openapi.TYPE_NUMBER)
+    type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=False, type=openapi.TYPE_STRING)
     name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등)', required=False, type=openapi.TYPE_STRING)
 
-    @swagger_auto_schema(tags=['샌드위치 재료 재고 데이터 가져오기'], manual_parameters=[type,name], responses={200: "Success"})
+    @swagger_auto_schema(tags=['샌드위치 재료 재고 데이터 가져오기 (재고가 0인 데이터 제외)'], manual_parameters=[type,name], responses={200: "Success"})
     def get(self, request, page_num):
         # 페이징 처리, 10개씩
         limit_cnt = 10
@@ -37,6 +43,11 @@ class GetSandwichIngredientInventory(APIView):
 
         r_type = request.GET.get('type')
         r_name = request.GET.get('name')
+
+        try:
+            r_type = sandwich_type[r_type]
+        except:
+            return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             if r_type and r_name:
@@ -61,7 +72,7 @@ class GetSandwichIngredientInventory(APIView):
     
 
 class SetSandwichIngredientInventory(APIView):
-    type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=False, type=openapi.TYPE_NUMBER)
+    type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=False, type=openapi.TYPE_STRING)
     name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등)', required=False, type=openapi.TYPE_STRING)
     plus_cnt = openapi.Parameter('plus_cnt', openapi.IN_QUERY, 
                                 description='추가할 데이터 개수 (최초 인서트 시 개수만큼 추가, 존재하는 데이터 인서트 시 파라미터 개수만큼 더하기', 
@@ -76,6 +87,11 @@ class SetSandwichIngredientInventory(APIView):
         r_name = request.POST.get('name')
         r_plus_cnt = request.POST.get('remain_cnt')
         r_price = request.POST.get('price')
+
+        try:
+            r_type = sandwich_type[r_type]
+        except:
+            return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         sandwich_ingredient_data = SandwichIngredient.objects.filter(Q(type=r_type) & Q(name=r_name))
 
@@ -117,7 +133,7 @@ class SetSandwichIngredientInventory(APIView):
 
 
 class DelSandwichIngredientInventory(APIView):
-    type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=True, type=openapi.TYPE_NUMBER)
+    type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=True, type=openapi.TYPE_STRING)
     name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등)', required=True, type=openapi.TYPE_STRING)
 
     @swagger_auto_schema(tags=['샌드위치 재고 데이터 삭제'], manual_parameters=[type,name], responses={200: "Success"})
@@ -125,9 +141,10 @@ class DelSandwichIngredientInventory(APIView):
         try:
             r_type = request.POST['type']
             r_name = request.POST['name']
+            r_type = sandwich_type[r_type]
         except:
             return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             sandwich_ingredient_data = SandwichIngredient.objects.filter(Q(type=r_type) & Q(name=r_name))
 
@@ -153,7 +170,7 @@ class DelSandwichIngredientInventory(APIView):
 
 
 class GetSandwichOrder(APIView):
-    search_type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스) - 필터링 시에만 사용', required=False, type=openapi.TYPE_NUMBER)
+    search_type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스) - 필터링 시에만 사용', required=False, type=openapi.TYPE_STRING)
     search_name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등) - 필터링 시에만 사용', required=False, type=openapi.TYPE_STRING)
 
     @swagger_auto_schema(tags=['샌드위치 주문 데이터 가져오기'], manual_parameters=[search_type,search_name], responses={200: "Success"})
@@ -164,6 +181,11 @@ class GetSandwichOrder(APIView):
 
         r_search_type = request.GET.get('search_type')
         r_search_name = request.GET.get('search_name')
+
+        try:
+            r_search_type = sandwich_type[r_search_type]
+        except:
+            return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             if r_search_type and r_search_name:
@@ -207,7 +229,7 @@ class GetSandwichOrder(APIView):
 
 
 class SetSandwichOrder(APIView):
-    bread = openapi.Parameter('bread', openapi.IN_QUERY, description='샌드위치 재료 타입(빵) - 식빵, 호밀빵, 치아바타 등, 최대 1개', required=True, type=openapi.TYPE_NUMBER)
+    bread = openapi.Parameter('bread', openapi.IN_QUERY, description='샌드위치 재료 타입(빵) - 식빵, 호밀빵, 치아바타 등, 최대 1개', required=True, type=openapi.TYPE_STRING)
     toping = openapi.Parameter('toping', openapi.IN_QUERY, description='샌드위치 재료 타입(토핑) - 햄, 베이컨, 치킨, 양상추, 토마토 등, 최대 2개', required=True, type=openapi.TYPE_STRING)
     cheeze = openapi.Parameter('cheeze', openapi.IN_QUERY, description='샌드위치 재료 타입(치즈) - 모짜렐라치즈, 슈레드치즈, 체다치즈 등, 최대 1개', required=True, type=openapi.TYPE_STRING)
     source = openapi.Parameter('source', openapi.IN_QUERY, description='샌드위치 재료 타입(소스) - 허니머스타드, 불닭소스, 스위트어니언. 케찹, 올리브오일 등, 최대 2개', required=True, type=openapi.TYPE_STRING)
@@ -257,6 +279,18 @@ class SetSandwichOrder(APIView):
                 for _ingredient in value:
                     _ingredient_data = SandwichIngredient.objects.filter(Q(type=type_key) & Q(name=_ingredient))
 
+                    if not _ingredient_data.exists():
+                        return Response(
+                            {'error' : {
+                            'code' : 404,
+                            'message' : "SandwichIngredient not found!"}})
+
+                    if _ingredient_data.values()[0]['remain_cnt'] == 0:
+                        return Response(
+                            {'error' : {
+                            'code' : 404,
+                            'message' : "SandwichIngredient not remained"}})
+
                     _ingredient_no = _ingredient_data.values('id')[0]['id']
                     ingredient_no_management(_ingredient_no, minus=True)
 
@@ -272,12 +306,12 @@ class SetSandwichOrder(APIView):
 
 
 class GetSandwichPrice(APIView):
-    bread = openapi.Parameter('bread', openapi.IN_QUERY, description='샌드위치 재료 타입(빵) - 식빵, 호밀빵, 치아바타 등, 최대 1개', required=False, type=openapi.TYPE_NUMBER)
+    bread = openapi.Parameter('bread', openapi.IN_QUERY, description='샌드위치 재료 타입(빵) - 식빵, 호밀빵, 치아바타 등, 최대 1개', required=False, type=openapi.TYPE_STRING)
     toping = openapi.Parameter('toping', openapi.IN_QUERY, description='샌드위치 재료 타입(토핑) - 햄, 베이컨, 치킨, 양상추, 토마토 등, 최대 2개', required=False, type=openapi.TYPE_STRING)
     cheeze = openapi.Parameter('cheeze', openapi.IN_QUERY, description='샌드위치 재료 타입(치즈) - 모짜렐라치즈, 슈레드치즈, 체다치즈 등, 최대 1개', required=False, type=openapi.TYPE_STRING)
     source = openapi.Parameter('source', openapi.IN_QUERY, description='샌드위치 재료 타입(소스) - 허니머스타드, 불닭소스, 스위트어니언. 케찹, 올리브오일 등, 최대 2개', required=False, type=openapi.TYPE_STRING)
 
-    @swagger_auto_schema(tags=['샌드위치 주문 데이터 가격 받아오디'], manual_parameters=[bread,toping,cheeze,source], responses={200: "Success"})
+    @swagger_auto_schema(tags=['샌드위치 주문 데이터 가격 받아오기'], manual_parameters=[bread,toping,cheeze,source], responses={200: "Success"})
     def get(self, request):
         r_bread = request.GET.get('bread')
         r_toping = request.GET.get('toping')
