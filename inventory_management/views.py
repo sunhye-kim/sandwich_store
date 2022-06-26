@@ -30,7 +30,8 @@ sandwich_type = {
     "치즈" : "CHEEZE"
 }
 
-# class InventoryManagement
+# 샌드위치 재료 재고 데이터 가져오기
+# 제외 : 재고가 0인 데이터는 제외한다
 class GetSandwichIngredientInventory(APIView):
     type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=False, type=openapi.TYPE_STRING)
     name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등)', required=False, type=openapi.TYPE_STRING)
@@ -41,23 +42,31 @@ class GetSandwichIngredientInventory(APIView):
         limit_cnt = 10
         offset_cnt = 10 *(page_num-1)
 
-        r_type = request.GET.get('type')
+        r_type = request.GET.get('type') # 빵,토핑,치즈,소스 만 가능
         r_name = request.GET.get('name')
 
         try:
-            r_type = sandwich_type[r_type]
+            r_type = sandwich_type[r_type] # 재고 데이터 대치 (빵 -> BREAD, 토핑 -> TOPING)
         except:
             return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # 파라미터별 검색 로직 
             if r_type and r_name:
-                all_sandwich_data = SandwichIngredient.objects.filter(Q(type=r_type) & Q(name=r_name)).exclude(remain_cnt=0)[offset_cnt:offset_cnt+limit_cnt]
+                all_sandwich_data = (SandwichIngredient.objects.
+                                    filter(Q(type=r_type) & Q(name=r_name)).
+                                    exclude(remain_cnt=0)[offset_cnt:offset_cnt+limit_cnt])
             elif r_name:
-                all_sandwich_data = SandwichIngredient.objects.filter(name=r_name).exclude(remain_cnt=0)[offset_cnt:offset_cnt+limit_cnt]
+                all_sandwich_data = (SandwichIngredient.objects.
+                                    filter(name=r_name).
+                                    exclude(remain_cnt=0)[offset_cnt:offset_cnt+limit_cnt])
             elif r_type:
-                all_sandwich_data = SandwichIngredient.objects.filter(type=r_type).exclude(remain_cnt=0)[offset_cnt:offset_cnt+limit_cnt]
+                all_sandwich_data = (SandwichIngredient.objects.
+                                    filter(type=r_type).
+                                    exclude(remain_cnt=0)[offset_cnt:offset_cnt+limit_cnt])
             else:
-                all_sandwich_data = SandwichIngredient.objects.exclude(remain_cnt=0)[offset_cnt:offset_cnt+limit_cnt]
+                all_sandwich_data = (SandwichIngredient.objects.
+                                    exclude(remain_cnt=0)[offset_cnt:offset_cnt+limit_cnt])
             
             return_data = {
                 "detail" : list(all_sandwich_data.values('type', 'name', 'price', 'remain_cnt')),
@@ -71,6 +80,8 @@ class GetSandwichIngredientInventory(APIView):
             return Response({"message": "page Error({})".format(page_num)}, status=status.HTTP_404_NOT_FOUND)
     
 
+# 샌드위치 재료 데이터 추가
+# 최초 인서트되는 데이터는 추가, 이미 존재하는 데이터는 업데이트
 class SetSandwichIngredientInventory(APIView):
     type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=False, type=openapi.TYPE_STRING)
     name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등)', required=False, type=openapi.TYPE_STRING)
@@ -79,24 +90,23 @@ class SetSandwichIngredientInventory(APIView):
                                 required=False, type=openapi.TYPE_STRING)
     price = openapi.Parameter('price', openapi.IN_QUERY, description='샌드위치 재료 가격 (insert, update)', required=False, type=openapi.TYPE_STRING)
 
-    @swagger_auto_schema(tags=['샌드위치 재고 데이터 추가'], manual_parameters=[type,name,plus_cnt,price], responses={200: "Success"})
+    @swagger_auto_schema(tags=['샌드위치 재고 데이터 추가 및 업데이트'], manual_parameters=[type,name,plus_cnt,price], responses={200: "Success"})
     def post(self, request):
-        is_errror = False
-
         r_type = request.POST.get('type')
         r_name = request.POST.get('name')
         r_plus_cnt = request.POST.get('remain_cnt')
         r_price = request.POST.get('price')
 
         try:
-            r_type = sandwich_type[r_type]
+            r_type = sandwich_type[r_type] # 재고 데이터 대치 (빵 -> BREAD, 토핑 -> TOPING)
         except:
             return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
-        sandwich_ingredient_data = SandwichIngredient.objects.filter(Q(type=r_type) & Q(name=r_name))
+        # 데이터 존재 여부 확인
+        sandwich_ingredient_data = (SandwichIngredient.objects.
+                                    filter(Q(type=r_type) & Q(name=r_name)))
 
-        # 데이터가 존재하면,
-        if sandwich_ingredient_data.exists():
+        if sandwich_ingredient_data.exists(): # 재고 데이터 대치 (빵 -> BREAD, 토핑 -> TOPING)
             ingredient_no = sandwich_ingredient_data.values()[0]['id']
             sandwich_inventory = SandwichIngredient.objects.get(pk=ingredient_no)
 
@@ -105,7 +115,7 @@ class SetSandwichIngredientInventory(APIView):
             sandwich_inventory.modify_dtime = timezone.now()
             sandwich_inventory.save()
 
-        else: # 존재하지 않으면
+        else: # 존재하지 않으면 인서트
             sandwich_ingredient = SandwichIngredient()
             sandwich_ingredient.type = r_type
             sandwich_ingredient.name = r_name
@@ -116,22 +126,16 @@ class SetSandwichIngredientInventory(APIView):
 
             sandwich_ingredient.save()
 
-        if not is_errror:
-            return_data = {
-                "detail": "success",
-                "status" : 200
-            }
-            
-            return Response(return_data, status = status.HTTP_204_NO_CONTENT)
-
-        else:
-            return_data = {
-                "detail": "failed",
-                "status" : 500
-            }
-            return Response(return_data)
+        return_data = {
+            "detail": "success",
+            "status" : 200
+        }
+        
+        return Response(return_data, status = status.HTTP_204_NO_CONTENT)
 
 
+# 샌드위치 재고 데이터 삭제
+# type, name 별 삭제
 class DelSandwichIngredientInventory(APIView):
     type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스)', required=True, type=openapi.TYPE_STRING)
     name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등)', required=True, type=openapi.TYPE_STRING)
@@ -146,7 +150,9 @@ class DelSandwichIngredientInventory(APIView):
             return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            sandwich_ingredient_data = SandwichIngredient.objects.filter(Q(type=r_type) & Q(name=r_name))
+            # 데이터 존재여부 확인
+            sandwich_ingredient_data = (SandwichIngredient.objects.
+                                        filter(Q(type=r_type)&Q(name=r_name)))
 
             # 데이터가 존재하면 진행
             if sandwich_ingredient_data.exists():
@@ -169,6 +175,8 @@ class DelSandwichIngredientInventory(APIView):
         return Response(return_data, status = status.HTTP_204_NO_CONTENT)
 
 
+# 샌드위치 주문 데이터 가져오기
+# type, name 별로 검색 가능
 class GetSandwichOrder(APIView):
     search_type = openapi.Parameter('type', openapi.IN_QUERY, description='샌드위치 재료 타입(빵,토핑,치즈,소스) - 필터링 시에만 사용', required=False, type=openapi.TYPE_STRING)
     search_name = openapi.Parameter('name', openapi.IN_QUERY, description='샌드위치 재료(바게트,토마토,모짜렐라,올리브오일 등) - 필터링 시에만 사용', required=False, type=openapi.TYPE_STRING)
@@ -183,18 +191,19 @@ class GetSandwichOrder(APIView):
         r_search_name = request.GET.get('search_name')
 
         try:
-            r_search_type = sandwich_type[r_search_type]
+            r_search_type = sandwich_type[r_search_type]# 재고 데이터 대치 (빵 -> BREAD, 토핑 -> TOPING)
+
         except:
             return Response({"message": "Check parameters"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            if r_search_type and r_search_name:
-                sandwich_order_data = (SandwichOrder.objects.values('sandwich_no')
-                    .annotate(dcount=Count('sandwich_no'))
-                    .filter(Q(is_delete=0)&Q(ingredient_type=r_search_type)&Q(ingredient_name=r_search_name))
-                    .order_by()[offset_cnt:offset_cnt+limit_cnt]
-                )
-            else:
+            # 삭제된 데이터는 조회 안됨 (is_delete = 0)
+            if r_search_type and r_search_name: # 검색 데이터 있을 때는 검색 쿼리 실행
+                sandwich_order_data = (SandwichOrder.objects.values('sandwich_no').
+                                    annotate(dcount=Count('sandwich_no')).
+                                    filter(Q(is_delete=0)&Q(ingredient_type=r_search_type)&Q(ingredient_name=r_search_name)).
+                                    order_by()[offset_cnt:offset_cnt+limit_cnt])
+            else: # 검색 데이터 없으면 전체 데이터 조회
                 sandwich_order_data = (SandwichOrder.objects.values('sandwich_no')
                     .annotate(dcount=Count('sandwich_no'))
                     .filter(Q(is_delete=0))
@@ -207,7 +216,10 @@ class GetSandwichOrder(APIView):
                 sandwich_dict['sandwich_no'] = _sandwich_order_data['sandwich_no']
 
                 sandwich_ingredient_list = list()
-                ingredient_data = SandwichOrder.objects.filter(sandwich_no=_sandwich_order_data['sandwich_no'])
+                ingredient_data = (SandwichOrder.objects.
+                                filter(sandwich_no=_sandwich_order_data['sandwich_no']))
+                
+                # 샌드위치 재료 데이터 조회
                 for _ingredient_data in ingredient_data.values():
                     sandwich_ingredient_list.append(_ingredient_data['ingredient_name'])
 
@@ -228,6 +240,7 @@ class GetSandwichOrder(APIView):
         return JsonResponse(return_data, safe=False)
 
 
+# 샌드위치 주문 데이터 저장
 class SetSandwichOrder(APIView):
     bread = openapi.Parameter('bread', openapi.IN_QUERY, description='샌드위치 재료 타입(빵) - 식빵, 호밀빵, 치아바타 등, 최대 1개', required=True, type=openapi.TYPE_STRING)
     toping = openapi.Parameter('toping', openapi.IN_QUERY, description='샌드위치 재료 타입(토핑) - 햄, 베이컨, 치킨, 양상추, 토마토 등, 최대 2개', required=True, type=openapi.TYPE_STRING)
@@ -242,17 +255,19 @@ class SetSandwichOrder(APIView):
         r_cheeze = request.GET.get('cheeze')
         r_source = request.GET.get('source')
 
-        if not r_bread or not r_toping or not r_cheeze or not r_source:
+        if not r_bread or not r_toping or not r_cheeze or not r_source: # 데이터 없으면 데러
             return Response(
                 {'error' : {
                 'code' : 405,
                 'message' : "All ingredient was not selected"}})
 
+        # 샌드위치 데이터 str -> list, ex) '토마토,햄' -> ['토마토','햄']
         bread = str(r_bread).replace(' ','').split(',')
         toping = str(r_toping).replace(' ','').split(',')
         cheeze = str(r_cheeze).replace(' ','').split(',')
         source = str(r_source).replace(' ','').split(',')
 
+        # 각각 최대 개수 이상 되면 에러
         if len(bread) > 1 or len(toping) > 2 or len(cheeze) > 1 or len(source) > 2:
             return Response(
                 {'error' : {
@@ -266,11 +281,12 @@ class SetSandwichOrder(APIView):
             "SOURCE" : source
         }
 
-        sandwich_no_data = SandwichOrder.objects.all().order_by("-sandwich_no")
-        if sandwich_no_data:
+        sandwich_no_data = (SandwichOrder.objects.
+                            all().order_by("-sandwich_no"))
+        if sandwich_no_data: # 샌드위치 데이터가 있으면, 다음 sanswich_no로 +1
             sandwich_no = sandwich_no_data.values()[0]['id'] + 1
-        else:
-            sandwich_no = 0
+        else: # 최초 인서트는 1
+            sandwich_no = 1
         
         # 인서트할 데이터 중에 재료가 없는거, 0개인게 없는지 확인
         for type_key, value in sandwich_dict.items():
@@ -311,6 +327,7 @@ class SetSandwichOrder(APIView):
         return redirect(redirect_url[:-1])
 
 
+# 샌드위치 가격 데이터 불러오기
 class GetSandwichPrice(APIView):
     bread = openapi.Parameter('bread', openapi.IN_QUERY, description='샌드위치 재료 타입(빵) - 식빵, 호밀빵, 치아바타 등, 최대 1개', required=False, type=openapi.TYPE_STRING)
     toping = openapi.Parameter('toping', openapi.IN_QUERY, description='샌드위치 재료 타입(토핑) - 햄, 베이컨, 치킨, 양상추, 토마토 등, 최대 2개', required=False, type=openapi.TYPE_STRING)
@@ -324,17 +341,19 @@ class GetSandwichPrice(APIView):
         r_cheeze = request.GET.get('cheeze')
         r_source = request.GET.get('source')
 
-        if not r_bread or not r_toping or not r_cheeze or not r_source:
+        if not r_bread or not r_toping or not r_cheeze or not r_source: # 필수 데이터
             return Response(
                 {'error' : {
                 'code' : 405,
                 'message' : "All ingredient was not selected"}})
 
+        # 샌드위치 데이터 str -> list, ex) '토마토,햄' -> ['토마토','햄']
         bread = str(r_bread).replace(' ','').split(',')
         toping = str(r_toping).replace(' ','').split(',')
         cheeze = str(r_cheeze).replace(' ','').split(',')
         source = str(r_source).replace(' ','').split(',')
 
+        # 각각 최대 개수 이상 되면 에러
         if len(bread) > 1 or len(toping) > 2 or len(cheeze) > 1 or len(source) > 2:
             return Response(
                 {'error' : {
@@ -348,8 +367,9 @@ class GetSandwichPrice(APIView):
             "SOURCE" : source
         }
 
-        total_price = 0
+        total_price = 0 
         
+        # 데이터 총 가격 데이터 
         for type_key, value in sandwich_dict.items():
             for _ingredient in value:
                 _ingredient_data = SandwichIngredient.objects.filter(Q(type=type_key) & Q(name=_ingredient))
@@ -364,18 +384,6 @@ class GetSandwichPrice(APIView):
         }
 
         return JsonResponse(return_data, safe=False)
-
-
-def ingredient_no_management(_ingredient_no, minus=True):
-    if minus:
-        bread_inventory_data = SandwichIngredient.objects.get(pk=_ingredient_no)
-        bread_inventory_data.remain_cnt = int(bread_inventory_data.remain_cnt) - 1
-        bread_inventory_data.save()
-    
-    else:
-        bread_inventory_data = SandwichIngredient.objects.get(pk=_ingredient_no)
-        bread_inventory_data.remain_cnt = int(bread_inventory_data.remain_cnt) + 1
-        bread_inventory_data.save()
 
 
 class DelSandwichOrder(APIView):
@@ -395,6 +403,7 @@ class DelSandwichOrder(APIView):
 
             for _sandwich_inventory in sandwich_inventory.values():
                 
+                # 재고 데이터 +1
                 _ingredient_data = SandwichIngredient.objects.filter(Q(type=_sandwich_inventory['ingredient_type']) & Q(name=_sandwich_inventory['ingredient_name']))
                 _ingredient_no = _ingredient_data.values('id')[0]['id']
                 ingredient_no_management(_ingredient_no, minus=False)
@@ -426,3 +435,18 @@ class DelSandwichOrder(APIView):
         
         return Response(return_data, status = status.HTTP_204_NO_CONTENT)
 
+
+# 재고 데이터 관리 (+1, -1)
+def ingredient_no_management(_ingredient_no, minus=True):
+    # 재고 데이터 -1
+    if minus:
+        bread_inventory_data = SandwichIngredient.objects.get(pk=_ingredient_no)
+        bread_inventory_data.remain_cnt = int(bread_inventory_data.remain_cnt) - 1
+        bread_inventory_data.save()
+    
+    #재고 데이터  +1
+    else:
+        bread_inventory_data = SandwichIngredient.objects.get(pk=_ingredient_no)
+        bread_inventory_data.remain_cnt = int(bread_inventory_data.remain_cnt) + 1
+        bread_inventory_data.save()
+        
